@@ -22,6 +22,20 @@ def main(tau, train_path, eval_path):
     # Plot validation predictions on top of training set
     # No need to save predictions
     # Plot data
+    x_eval, y_eval = util.load_dataset(eval_path, add_intercept=True)
+
+    model = LocallyWeightedLinearRegression(tau=tau)
+    model.fit(x_train, y_train)
+
+    y_pred = model.predict(x_eval)
+    
+    mse = np.mean((y_pred - y_eval) ** 2)
+    print("MSE: ", mse)
+
+    plt.figure()
+    plt.plot(x_train, y_train, "bx")
+    plt.plot(x_eval, y_pred, "ro")
+    plt.savefig(figure_path)
     # *** END CODE HERE ***
 
 
@@ -45,6 +59,8 @@ class LocallyWeightedLinearRegression(LinearModel):
 
         """
         # *** START CODE HERE ***
+        self.x = x  # shape (m_train, n)
+        self.y = y  # shape (m_train, )
         # *** END CODE HERE ***
 
     def predict(self, x):
@@ -57,4 +73,22 @@ class LocallyWeightedLinearRegression(LinearModel):
             Outputs of shape (m,).
         """
         # *** START CODE HERE ***
+        # y_pred = np.zeros(x.shape[0])
+        # for i in range(x.shape[0]):
+        #     w = np.exp(- np.linalg.norm(x[i] - self.x, axis=1) ** 2 / (2 * self.tau ** 2)) # shape (m, )
+        #     W = np.diag(w)  # shape (m_train, m_train)
+        #     theta = np.linalg.inv(self.x.T @ W @ self.x) @ self.x.T @ W @ self.y    # shape (n, )
+        #     y_pred[i] = x[i] @ theta
+
+        w = np.exp(- np.linalg.norm(np.expand_dims(x, axis=1) - self.x, axis=-1) ** 2 / (2 * self.tau ** 2)) # shape (m, m_train)
+        W = np.apply_along_axis(np.diag, axis=1, arr=w)  # shape (m, m_train, m_train)  # 将 np.diag 作用到 w 的 axis=1 的每一行
+        theta = np.linalg.inv(self.x.T @ W @ self.x) @ self.x.T @ W @ self.y    # shape (m, n)
+        y_pred = np.einsum("ij,ij->i", x, theta)
+        return y_pred
         # *** END CODE HERE ***
+
+if __name__ == "__main__":
+    figure_path = "figures/p05b_ds5.png"
+    main(tau=5e-1,
+         train_path='../data/ds5_train.csv',
+         eval_path='../data/ds5_valid.csv')

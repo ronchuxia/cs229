@@ -17,16 +17,16 @@ def main(train_path, eval_path, pred_path):
     x_eval, y_eval = util.load_dataset(eval_path, add_intercept=False)
 
     # *** START CODE HERE ***
-    clf = GDA()
-    clf.fit(x_train, y_train)
-    y_pred = clf.predict(x_eval)
+    model = GDA()
+    model.fit(x_train, y_train)
+    y_pred = model.predict(x_eval)
     np.savetxt(pred_path, y_pred, fmt="%d")
 
     eval_accuracy = np.sum(y_pred == y_eval) / y_eval.shape[0]
     print("Eval Accuracy: ", eval_accuracy)
 
-    util.plot(x_train, y_train, clf.theta, figure_path_train)
-    util.plot(x_eval, y_eval, clf.theta, figure_path_eval)
+    util.plot(x_train, y_train, model.theta, figure_path_train)
+    util.plot(x_eval, y_eval, model.theta, figure_path_eval)
     # *** END CODE HERE ***
 
 

@@ -16,16 +16,16 @@ def main(train_path, eval_path, pred_path):
     x_eval, y_eval = util.load_dataset(eval_path, add_intercept=True)
 
     # *** START CODE HERE ***
-    clf = LogisticRegression()
-    clf.fit(x_train, y_train)
-    y_pred = clf.predict(x_eval)
+    model = LogisticRegression()
+    model.fit(x_train, y_train)
+    y_pred = model.predict(x_eval)
     np.savetxt(pred_path, y_pred, fmt="%d")
 
     eval_accuracy = np.sum(y_pred == y_eval) / y_eval.shape[0]
     print("Eval Accuracy: ", eval_accuracy)
 
-    util.plot(x_train, y_train, clf.theta, figure_path_train)
-    util.plot(x_eval, y_eval, clf.theta, figure_path_eval)
+    util.plot(x_train, y_train, model.theta, figure_path_train)
+    util.plot(x_eval, y_eval, model.theta, figure_path_eval)
     # *** END CODE HERE ***
 
 
@@ -67,13 +67,13 @@ class LogisticRegression(LinearModel):
             Returns:
                 Hessian of J(theta). Shape(n, n).
             """
-            return (x.T * h(x) * (1 - h(x))) @ x / x.shape[0]   # NOTE
+            return (x.T * h(x) * (1 - h(x))) @ x / x.shape[0]   # NOTE：对所有数据求和可以用矩阵乘法完成
 
         m, n = x.shape
         self.theta = np.zeros(n)    # shape (n, )
 
-        v = np.ones(self.theta.shape)
-        while (np.linalg.norm(v) > 1e-5) :
+        v = np.ones_like(self.theta)
+        while np.linalg.norm(v) > 1e-5 :
             d_theta = - (1 / m) * np.sum(np.expand_dims(y - h(x), axis=1) * x, axis=0) 
             v = np.linalg.inv(H(x)) @ d_theta
             self.theta -= v
