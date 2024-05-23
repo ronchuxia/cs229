@@ -6,7 +6,7 @@ import numpy as np
 import util
 
 
-def initial_state():
+def initial_state(train_x):
     """Return the initial state for the perceptron.
 
     This function computes and then returns the initial state of the perceptron.
@@ -16,6 +16,9 @@ def initial_state():
     """
 
     # *** START CODE HERE ***
+    beta = np.zeros(train_x.shape[0])
+    state = {'train_x': train_x, 'beta': beta, 'i': 0}
+    return state
     # *** END CODE HERE ***
 
 
@@ -33,6 +36,12 @@ def predict(state, kernel, x_i):
         Returns the prediction (i.e 0 or 1)
     """
     # *** START CODE HERE ***
+    train_x = state['train_x']  # shape (m, n)
+    beta = state['beta']    # shape (m, )
+    m, _ = train_x.shape
+
+    pred = sign(sum([beta[i] * kernel(train_x[i], x_i) for i in range(m)]))
+    return pred
     # *** END CODE HERE ***
 
 
@@ -47,6 +56,11 @@ def update_state(state, kernel, learning_rate, x_i, y_i):
         y_i: A 0 or 1 indicating the label for a single instance
     """
     # *** START CODE HERE ***
+    beta = state['beta']    # shape (m, )
+    i = state['i']
+
+    beta[i] = learning_rate * (y_i - predict(state, kernel, x_i))
+    state['i'] += 1
     # *** END CODE HERE ***
 
 
@@ -96,7 +110,7 @@ def train_perceptron(kernel_name, kernel, learning_rate):
     """
     train_x, train_y = util.load_csv('../data/ds5_train.csv')
 
-    state = initial_state()
+    state = initial_state(train_x)
 
     for x_i, y_i in zip(train_x, train_y):
         update_state(state, kernel, learning_rate, x_i, y_i)
@@ -106,7 +120,7 @@ def train_perceptron(kernel_name, kernel, learning_rate):
     plt.figure(figsize=(12, 8))
     util.plot_contour(lambda a: predict(state, kernel, a))
     util.plot_points(test_x, test_y)
-    plt.savefig('./output/p05_{}_output.pdf'.format(kernel_name))
+    plt.savefig('./figures/p05_{}_output.png'.format(kernel_name))
 
     predict_y = [predict(state, kernel, test_x[i, :]) for i in range(test_y.shape[0])]
 

@@ -21,6 +21,8 @@ def get_words(message):
     """
 
     # *** START CODE HERE ***
+    words = message.lower().split(' ')
+    return words
     # *** END CODE HERE ***
 
 
@@ -41,6 +43,23 @@ def create_dictionary(messages):
     """
 
     # *** START CODE HERE ***
+    dictionary = {}
+    word_count = {}
+    for message in messages:
+        words = get_words(message)
+        for word in words:
+            if word in word_count:
+                word_count[word] += 1
+            else:
+                word_count[word] = 1
+    
+    i = 0
+    for word in word_count:
+        if word_count[word] >= 5:
+            dictionary[word] = i
+            i += 1
+
+    return dictionary
     # *** END CODE HERE ***
 
 
@@ -62,6 +81,18 @@ def transform_text(messages, word_dictionary):
         A numpy array marking the words present in each message.
     """
     # *** START CODE HERE ***
+    dict_size = len(word_dictionary)
+    num_messages = len(messages)
+    x = np.zeros((num_messages, dict_size))
+
+    for i, message in enumerate(messages):
+        words = get_words(message)
+        for word in words:
+            if word in word_dictionary:
+                i_word = word_dictionary[word]
+                x[i, i_word] += 1     
+
+    return x 
     # *** END CODE HERE ***
 
 
@@ -82,6 +113,13 @@ def fit_naive_bayes_model(matrix, labels):
     """
 
     # *** START CODE HERE ***
+    n, v = matrix.shape
+
+    phi_y = np.sum(labels == 1) / n
+    phi_k_y_1 = (np.sum(matrix[labels == 1], axis=0) + 1) / (np.sum(matrix[labels == 1]) + v)
+    phi_k_y_0 = (np.sum(matrix[labels == 0], axis=0) + 1) / (np.sum(matrix[labels == 0]) + v)
+
+    return phi_y, phi_k_y_1, phi_k_y_0
     # *** END CODE HERE ***
 
 
@@ -93,11 +131,16 @@ def predict_from_naive_bayes_model(model, matrix):
 
     Args:
         model: A trained model from fit_naive_bayes_model
-        matrix: A numpy array containing word counts
+        matrix: A numpy array containing word counts, shape (m, v)
 
     Returns: A numpy array containg the predictions from the model
     """
     # *** START CODE HERE ***
+    phi_y, phi_k_y_1, phi_k_y_0 = model # phi_y: scalar; phi_k_y_1: shape (v, ); phi_k_y_0: shape (v, )
+    
+    log_p_x_y_1 = np.log(phi_y) + np.sum(matrix * np.expand_dims(np.log(phi_k_y_1), axis=0), axis=1)    # shape (m, )
+    log_p_x_y_0 = np.log(1 - phi_y) + np.sum(matrix * np.expand_dims(np.log(phi_k_y_0), axis=0), axis=1)
+    return log_p_x_y_1 >= log_p_x_y_0
     # *** END CODE HERE ***
 
 
@@ -114,6 +157,14 @@ def get_top_five_naive_bayes_words(model, dictionary):
     Returns: The top five most indicative words in sorted order with the most indicative first
     """
     # *** START CODE HERE ***
+    _, phi_k_y_1, phi_k_y_0 = model # phi_y: scalar; phi_k_y_1: shape (v, ); phi_k_y_0: shape (v, )
+
+    indication = np.log(phi_k_y_0 / phi_k_y_1)
+    top_five = np.argsort(indication)[:5]
+
+    words_list = list(dictionary.keys())
+    top_five_words = [words_list[index] for index in top_five]
+    return top_five_words
     # *** END CODE HERE ***
 
 
@@ -125,7 +176,7 @@ def compute_best_svm_radius(train_matrix, train_labels, val_matrix, val_labels, 
 
     Args:
         train_matrix: The word counts for the training data
-        train_labels: The spma or not spam labels for the training data
+        train_labels: The spam or not spam labels for the training data
         val_matrix: The word counts for the validation data
         val_labels: The spam or not spam labels for the validation data
         radius_to_consider: The radius values to consider
@@ -134,6 +185,17 @@ def compute_best_svm_radius(train_matrix, train_labels, val_matrix, val_labels, 
         The best radius which maximizes SVM accuracy.
     """
     # *** START CODE HERE ***
+    best_accuracy = 0
+    best_i = 0
+    for i, radius in enumerate(radius_to_consider):
+        pred = svm.train_and_predict_svm(train_matrix, train_labels, val_matrix, radius)
+        accuracy = np.sum(pred == val_labels) / val_labels.shape[0]
+        if accuracy > best_accuracy:
+            best_accuracy = accuracy
+            best_i = i
+        print(i, radius, accuracy)
+
+    return radius_to_consider[best_i]
     # *** END CODE HERE ***
 
 

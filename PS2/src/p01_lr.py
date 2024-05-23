@@ -31,6 +31,7 @@ def logistic_regression(X, Y):
             print('Finished %d iterations' % i)
         if np.linalg.norm(prev_theta - theta) < 1e-15:
             print('Converged in %d iterations' % i)
+            print('Converged on theta: ', theta)
             break
     return
 
