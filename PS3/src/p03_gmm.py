@@ -32,6 +32,15 @@ def main(is_semi_supervised, trial_num):
     # phi should be a numpy array of shape (K,)
     # (3) Initialize the w values to place equal probability on each Gaussian
     # w should be a numpy array of shape (m, K)
+    np.random.shuffle(x)
+    x_grouped = np.array_split(x, K)
+    mu = np.array([np.mean(x_group, axis=0) for x_group in x_grouped])
+    sigma = np.array([np.cov(np.transpose(x_group)) for x_group in x_grouped])
+
+    phi = np.ones(K) / K
+
+    m = x.shape[0]
+    w = np.ones((m, K)) / K
     # *** END CODE HERE ***
 
     if is_semi_supervised:
@@ -57,8 +66,8 @@ def run_em(x, w, phi, mu, sigma):
         x: Design matrix of shape (m, n).
         w: Initial weight matrix of shape (m, k).
         phi: Initial mixture prior, of shape (k,).
-        mu: Initial cluster means, list of k arrays of shape (n,).
-        sigma: Initial cluster covariances, list of k arrays of shape (n, n).
+        mu: Initial cluster means, of shape (k, n).
+        sigma: Initial cluster covariances, of shape (k, n, n).
 
     Returns:
         Updated weight matrix of shape (m, k) resulting from EM algorithm.
@@ -82,7 +91,23 @@ def run_em(x, w, phi, mu, sigma):
         # By log-likelihood, we mean `ll = sum_x[log(sum_z[p(x|z) * p(z)])]`.
         # We define convergence by the first iteration where abs(ll - prev_ll) < eps.
         # Hint: For debugging, recall part (a). We showed that ll should be monotonically increasing.
+        m, n = x.shape
+        x_unbiased = np.expand_dims(x, axis=1) - np.expand_dims(mu, axis=0) # shape (m, k, n)
+        w_unnormalized = np.squeeze(np.exp(- (1 / 2) * np.expand_dims(x_unbiased, axis=2) @ np.expand_dims(np.linalg.inv(sigma), axis=0) @ np.expand_dims(x_unbiased, axis=3))) * phi / ((2 * np.pi) ** (n / 2) * np.linalg.det(sigma) ** (1 / 2)) # shape (m, k)
+        w = w_unnormalized / np.sum(w_unnormalized, axis=1, keepdims=True) # shape (m, k)
+
+        phi = np.sum(w, axis=0) / m # shape (k, )
+        mu = np.transpose(w) @ x / np.expand_dims(np.sum(w, axis=0), axis=1)  # shape (k, n)
+        sigma = np.transpose(np.expand_dims(w, axis=2) * x_unbiased, (1, 2, 0)) @ np.transpose(x_unbiased, (1, 0, 2)) / np.expand_dims(np.sum(w, axis=0), axis=(1, 2)) # shape (k, n, n)
+        
+        prev_ll = ll
+        ll = np.sum(np.log(np.sum(w_unnormalized, axis=1)), axis=0)
+        # print(ll)
+
+        it += 1
         # *** END CODE HERE ***
+
+    print(it)
 
     return w
 
@@ -98,8 +123,8 @@ def run_semi_supervised_em(x, x_tilde, z, w, phi, mu, sigma):
         z: Array of labels of shape (m_tilde, 1).
         w: Initial weight matrix of shape (m, k).
         phi: Initial mixture prior, of shape (k,).
-        mu: Initial cluster means, list of k arrays of shape (n,).
-        sigma: Initial cluster covariances, list of k arrays of shape (n, n).
+        mu: Initial cluster means, of shape (k, n).
+        sigma: Initial cluster covariances, of shape (k, n, n).
 
     Returns:
         Updated weight matrix of shape (m, k) resulting from semi-supervised EM algorithm.
@@ -123,7 +148,31 @@ def run_semi_supervised_em(x, x_tilde, z, w, phi, mu, sigma):
         # (3) Compute the log-likelihood of the data to check for convergence.
         # Hint: Make sure to include alpha in your calculation of ll.
         # Hint: For debugging, recall part (a). We showed that ll should be monotonically increasing.
+        m, n = x.shape
+        x_unbiased = np.expand_dims(x, axis=1) - np.expand_dims(mu, axis=0) # shape (m, k, n)
+        w_unnormalized = np.squeeze(np.exp(- (1 / 2) * np.expand_dims(x_unbiased, axis=2) @ np.expand_dims(np.linalg.inv(sigma), axis=0) @ np.expand_dims(x_unbiased, axis=3))) * phi / ((2 * np.pi) ** (n / 2) * np.linalg.det(sigma) ** (1 / 2)) # shape (m, k)
+        w = w_unnormalized / np.sum(w_unnormalized, axis=1, keepdims=True) # shape (m, k)
+
+        m_tilde = x_tilde.shape[0]
+        labels = np.arange(K)   # shape (k, )
+        indicator = z == np.expand_dims(labels, axis=0) # shape (m_tilde, k)
+
+        x_tilde_unbiased = np.expand_dims(x_tilde, axis=1) - np.expand_dims(mu, axis=0) # shape (m_tilde, k, n)
+        w_tilde_unnormalized = np.squeeze(np.exp(- (1 / 2) * np.expand_dims(x_tilde_unbiased, axis=2) @ np.expand_dims(np.linalg.inv(sigma), axis=0) @ np.expand_dims(x_tilde_unbiased, axis=3))) * phi / ((2 * np.pi) ** (n / 2) * np.linalg.det(sigma) ** (1 / 2)) # shape (m_tilde, k)
+        w_tilde_unnormalized *= indicator
+
+        phi = (np.sum(w, axis=0) + alpha * np.sum(indicator, axis=0)) / (m + alpha * m_tilde) # shape (k, )
+        mu = (np.transpose(w) @ x + alpha * np.transpose(indicator) @ x_tilde) / (np.expand_dims(np.sum(w, axis=0), axis=1) + alpha * np.expand_dims(np.sum(indicator, axis=0), axis=1)) # shape (k, n)
+        sigma = (np.transpose(np.expand_dims(w, axis=2) * x_unbiased, (1, 2, 0)) @ np.transpose(x_unbiased, (1, 0, 2)) + alpha * np.transpose(np.expand_dims(indicator, axis=2) * x_tilde_unbiased, (1, 2, 0)) @ np.transpose(x_tilde_unbiased, (1, 0, 2))) / (np.expand_dims(np.sum(w, axis=0), axis=(1, 2)) + alpha * np.expand_dims(np.sum(indicator, axis=0), axis=(1, 2))) # shape (k, n, n)
+        
+        prev_ll = ll
+        ll = np.sum(np.log(np.sum(w_unnormalized, axis=1)), axis=0) + alpha * np.sum(np.log(np.sum(w_tilde_unnormalized, axis=1)), axis=0)
+        # print(ll)
+
+        it += 1
         # *** END CODE HERE ***
+
+    print(it)
 
     return w
 
@@ -197,5 +246,5 @@ if __name__ == '__main__':
         # Once you've implemented the semi-supervised version,
         # uncomment the following line.
         # You do not need to add any other lines in this code block.
-        # main(with_supervision=True, trial_num=t)
+        main(is_semi_supervised=True, trial_num=t)
         # *** END CODE HERE ***
