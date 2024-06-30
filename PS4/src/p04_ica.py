@@ -21,6 +21,9 @@ def update_W(W, x, learning_rate):
     """
     
     # *** START CODE HERE ***
+    x = np.expand_dims(x, axis=1)   # shape (5, 1)
+    dW = - np.sign(W @ x) @ np.transpose(x) + np.transpose(np.linalg.inv(W))
+    updated_W = W + learning_rate * dW
     # *** END CODE HERE ***
 
     return updated_W
@@ -42,6 +45,7 @@ def unmix(X, W):
 
 
     # *** START CODE HERE ***
+    S = X @ np.transpose(W)
     # *** END CODE HERE ***
 
     return S
@@ -60,13 +64,13 @@ def save_W(W):
     np.savetxt('output/W.txt',W)
 
 def save_sound(audio, name):
-    scipy.io.wavfile.write('output/{}.wav'.format(name), Fs, audio)
+    scipy.io.wavfile.write('output/{}.wav'.format(name), Fs, audio.astype(np.float32))
 
 def unmixer(X):
     M, N = X.shape
     W = np.eye(N)
 
-    anneal = [0.1 , 0.1, 0.1, 0.05, 0.05, 0.05, 0.02, 0.02, 0.01 , 0.01, 0.005, 0.005, 0.002, 0.002, 0.001, 0.001]
+    anneal = [0.1, 0.1, 0.1, 0.05, 0.05, 0.05, 0.02, 0.02, 0.01 , 0.01, 0.005, 0.005, 0.002, 0.002, 0.001, 0.001]
     print('Separating tracks ...')
     for lr in anneal:
         print(lr)

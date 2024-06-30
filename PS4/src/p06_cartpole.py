@@ -40,7 +40,7 @@ model.
 `TOLERANCE`: Controls the convergence criteria for each value iteration
 run. In value iteration, you can assume convergence when the maximum
 absolute change in the value function at any state in an iteration
-becomes lower than `TOLERANCE.
+becomes lower than `TOLERANCE`.
 
 You need to write code that chooses the best action according
 to your current value function, and the current model of the MDP. The
@@ -125,6 +125,14 @@ def choose_action(state, mdp_data):
     """
 
     # *** START CODE HERE ***
+    transition_probs = mdp_data['transition_probs'][state]  # shape (num_states, 2)
+    value = mdp_data['value']   # shape (num_states, )
+    expected_future_payoff = np.transpose(transition_probs) @ np.expand_dims(value, axis=1) # shape (2, 1)
+    if abs(expected_future_payoff[0] - expected_future_payoff[1]) < 1e-10:
+        return np.random.randint(2)
+    else:
+        optimal_action = np.argmax(expected_future_payoff, axis=0)
+        return optimal_action
     # *** END CODE HERE ***
 
 def update_mdp_transition_counts_reward_counts(mdp_data, state, action, new_state, reward):
@@ -149,6 +157,15 @@ def update_mdp_transition_counts_reward_counts(mdp_data, state, action, new_stat
     """
 
     # *** START CODE HERE ***
+    # Record the number of times `state, action, new_state` occurs.
+    mdp_data['transition_counts'][state, new_state, action] += 1
+
+    # Record the rewards for every `new_state`.
+    if reward == -1:
+        mdp_data['reward_counts'][new_state, 0] += 1
+
+    # Record the number of time `new_state` was reached.
+    mdp_data['reward_counts'][new_state, 1] += 1
     # *** END CODE HERE ***
 
     # This function does not return anything
@@ -172,6 +189,22 @@ def update_mdp_transition_probs_reward(mdp_data):
     """
 
     # *** START CODE HERE ***
+    transition_counts = mdp_data['transition_counts']   # shape (num_states, num_states, num_actions)
+    transition_probs = mdp_data['transition_probs'] # shape (num_states, num_states, num_actions)
+    reward_counts = mdp_data['reward_counts']   # shape (num_states, 2)
+    reward = mdp_data['reward'] # shape (num_states, )
+
+    num_states = transition_counts.shape[0]
+    transition_probs_mask = np.sum(transition_counts, axis=1, keepdims=True) == 0  # shape (num_states, 1, num_actions)
+    transition_probs_mask = np.repeat(transition_probs_mask, num_states, axis=1)
+    new_transition_probs = transition_counts / np.sum(transition_counts, axis=1, keepdims=True)
+    new_transition_probs[transition_probs_mask] = transition_probs[transition_probs_mask]
+
+    reward_mask = reward_counts[:, 1] != 0
+    reward[reward_mask] = - reward_counts[reward_mask, 0] / reward_counts[reward_mask, 1]
+
+    mdp_data['transition_probs'] = new_transition_probs
+    mdp_data['reward'] = reward
     # *** END CODE HERE ***
 
     # This function does not return anything
@@ -198,11 +231,28 @@ def update_mdp_value(mdp_data, tolerance, gamma):
     """
 
     # *** START CODE HERE ***
+    num_iterations = 0
+    old_value = None
+    value = mdp_data['value']   # shape (num_states, )
+    reward = mdp_data['reward'] # shape (num_states, )
+    transition_probs = mdp_data['transition_probs'] # shape (num_states, num_states, num_actions)
+
+    while old_value is None or np.max(np.abs(value - old_value)) >= tolerance:
+        old_value = value.copy()
+        value = reward + gamma * np.max(np.transpose(transition_probs, axes=(0, 2, 1)) @ value, axis=1) # shape (num_states, )
+        num_iterations += 1
+
+    mdp_data['value'] = value
+
+    if num_iterations == 1:
+        return True
+    else:
+        return False
     # *** END CODE HERE ***
 
 def main(plot=True):
     # Seed the randomness of the simulation so this outputs the same thing each time
-    seed = 0
+    seed = 3
     np.random.seed(seed)
 
     # Simulation parameters
